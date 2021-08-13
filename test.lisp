@@ -1,0 +1,6 @@
+(console.log (array "memes" "beams"))
+(console.log (object "name" "Vas"))
+(function add (a)
+    (return (function inner (b)
+        (return (+ a b)))))
+(|> 1 (add 1) (add 2) (add -34) console.log)
