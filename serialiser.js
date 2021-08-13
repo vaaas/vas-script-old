@@ -1,3 +1,5 @@
+const I = x => x
+const W = f => x => f(x)(x)
 const wrap = (first, last) => x => first + x + last
 const wrap_parentheses = wrap('(', ')')
 const wrap_braces = wrap('{', '}')
@@ -61,7 +63,7 @@ function serialise_object(x) {
 }
 
 function serialise_array(x) {
-    return wrap_brackets(x.slice(1).map(serialise_array).join(', '))
+    return wrap_brackets(x.slice(1).map(serialise).join(', '))
 }
 
 function serialise_call(x) {
@@ -73,10 +75,7 @@ function serialise_sum(x) {
 }
 
 function serialise_pipe(x) {
-	const xs = []
-	for (const y of x.slice(1).reverse())
-		xs.push(serialise(y))
-    return xs.join('(') + repeat_string(')', x.length - 2)
+    return x.slice(1).reverse().map(serialise).join('(') + repeat_string(')', x.length - 2)
 }
 
 function serialise_arrow(x) {
@@ -99,25 +98,31 @@ function serialise_const(x) {
 	return 'const ' + x[1] + '=' + serialise(x[2])
 }
 
-function serialise(x) {
+function serialise_nested(x) {
+    return serialise(x[0]) + x.slice(1).map(serialise).map(wrap_parentheses)
+}
+
+function choose_serialisation_function(x) {
 	if (x.constructor === Array) {
         if (x[0].constructor === Array)
-            return serialise(x[0]) + x.slice(1).map(serialise).map(wrap_parentheses)
+            return serialise_nested
 		switch (x[0]) {
-			case 'function': return serialise_function(x)
-			case 'curried': return serialise_curried_function(x)
-			case 'lambda': return serialise_lambda(x)
-			case 'object': return serialise_object(x)
-			case 'array': return serialise_array(x)
-			case 'return': return serialise_return(x)
-			case '+': return serialise_sum(x)
-			case '|>': return serialise_pipe(x)
-			case '>>': return serialise_arrow(x)
-			case 'var': return serialise_var(x)
-			case 'const': return serialise_const(x)
-			default: return serialise_call(x)
+			case 'function': return serialise_function
+			case 'curried': return serialise_curried_function
+			case 'lambda': return serialise_lambda
+			case 'object': return serialise_object
+			case 'array': return serialise_array
+			case 'return': return serialise_return
+			case '+': return serialise_sum
+			case '|>': return serialise_pipe
+			case '>>': return serialise_arrow
+			case 'var': return serialise_var
+			case 'const': return serialise_const
+			default: return serialise_call
 		}
-	} else return + x
+	} else return I
 }
+
+const serialise = W(choose_serialisation_function)
 
 module.exports = serialise
