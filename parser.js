@@ -70,7 +70,8 @@ function value(stream) {
 	while (!stream.complete()) {
 		const n = stream.next()
 		if (whitespace_p(n)) break
-		if (n === ')') {
+        if (n === '(') throw 'unexpected opening parenthesis'
+		else if (n === ')') {
 			stream.rollback()
 			break
 		}
