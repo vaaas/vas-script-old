@@ -78,12 +78,8 @@ function serialise_pipe(x) {
     return x.slice(1).reverse().map(serialise).join('(') + repeat_string(')', x.length - 2)
 }
 
-function serialise_arrow(x) {
-	const xs = []
-	for (const y of x.slice(1).reverse())
-		xs.push(serialise(y))
-	xs.push('__x')
-    return '__x=>' + xs.join('(') + repeat_string(')', x.length - 1)
+function serialise_comp(x) {
+    return '__x=>' + [ ...x.slice(1).reverse().map(serialise), '__x'].join('(') + repeat_string(')', x.length - 1)
 }
 
 function serialise_return(x) {
@@ -102,6 +98,10 @@ function serialise_nested(x) {
     return serialise(x[0]) + x.slice(1).map(serialise).map(wrap_parentheses)
 }
 
+function serialise_apply(x) {
+    return x[1] + x.slice(2).map(serialise).map(wrap_parentheses).join('')
+}
+
 function choose_serialisation_function(x) {
 	if (x.constructor === Array) {
         if (x[0].constructor === Array)
@@ -114,10 +114,11 @@ function choose_serialisation_function(x) {
 			case 'array': return serialise_array
 			case 'return': return serialise_return
 			case '+': return serialise_sum
-			case '|>': return serialise_pipe
-			case '>>': return serialise_arrow
+			case 'pipe': return serialise_pipe
+			case 'comp': return serialise_comp
 			case 'var': return serialise_var
 			case 'const': return serialise_const
+            case 'apply': return serialise_apply
 			default: return serialise_call
 		}
 	} else return I
