@@ -1,3 +1,8 @@
+const wrap = (first, last) => x => first + x + last
+const wrap_parentheses = wrap('(', ')')
+const wrap_braces = wrap('{', '}')
+const wrap_brackets = wrap('[', ']')
+
 function repeat_string(string, times) {
     let big = ''
     for (let i = 0; i < times; i++) big += string
@@ -5,11 +10,11 @@ function repeat_string(string, times) {
 }
 
 function serialise_function_body(x) {
-    return '{' + x.map(serialise) + '}'
+    return wrap_braces(x.map(serialise))
 }
 
 function serialise_function_arguments(x) {
-    return '(' + x.join(',') + ')'
+    return wrap_parentheses(x.join(','))
 }
 
 function serialise_function(x) {
@@ -19,12 +24,9 @@ function serialise_function(x) {
 }
 
 function serialise_curried_function(x) {
-    const xs = []
-    for (const y of x[3])
-        xs.push('(' + y + ')')
     return 'function ' +
         x[2] +
-        xs.join('{return function') +
+        x[3].map(wrap_parentheses).join('{return function') +
         serialise_function_body(x.slice(4)) +
         repeat_string('}', x[3].length - 1)
 }
@@ -34,7 +36,7 @@ function serialise_lambda(x) {
 	xs.push((function() { switch(x[1].length) {
 		case 0: return '()'
 		case 1: return x[1][0]
-		default: return '(' + x[1].join(',') + ')'
+		default: return wrap_parentheses(x[1].join(','))
 	}})())
 	xs.push('=>')
 	xs.push(serialise(x[2]))
@@ -43,7 +45,6 @@ function serialise_lambda(x) {
 
 function serialise_object(x) {
 	const xs = []
-	xs.push('{')
 	let even = true
 	for (const y of x.slice(1)) {
 		if (even) {
@@ -56,16 +57,15 @@ function serialise_object(x) {
 			even = true
 		}
 	}
-	xs.push('}')
-	return xs.join('')
+	return wrap_braces(xs.join(''))
 }
 
 function serialise_array(x) {
-	return '[' + x.slice(1).map(serialise).join(', ') + ']'
+    return wrap_brackets(x.slice(1).map(serialise_array).join(', '))
 }
 
 function serialise_call(x) {
-	return x[0] + '(' + x.slice(1).map(serialise).join(', ') + ')'
+	return x[0] + wrap_parentheses(x.slice(1).map(serialise).join(', '))
 }
 
 function serialise_sum(x) {
@@ -100,8 +100,9 @@ function serialise_const(x) {
 }
 
 function serialise(x) {
-    console.log(x)
 	if (x.constructor === Array) {
+        if (x[0].constructor === Array)
+            return serialise(x[0]) + x.slice(1).map(serialise).map(wrap_parentheses)
 		switch (x[0]) {
 			case 'function': return serialise_function(x)
 			case 'curried': return serialise_curried_function(x)
@@ -116,7 +117,7 @@ function serialise(x) {
 			case 'const': return serialise_const(x)
 			default: return serialise_call(x)
 		}
-	} else return x
+	} else return + x
 }
 
 module.exports = serialise
