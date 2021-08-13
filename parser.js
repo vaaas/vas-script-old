@@ -33,10 +33,10 @@ function parser(string) {
 }
 
 function* list_or_value_stream(stream) {
-	while (!stream.complete()) {
-		const x = list_or_value(stream)
-		if (x === StopIteration) break
-		else yield x
+	let x = list_or_value(stream)
+	while (x !== StopIteration) {
+		yield x
+		x = list_or_value(stream)
 	}
 }
 
@@ -70,12 +70,11 @@ function value(stream) {
 	while (!stream.complete()) {
 		const n = stream.next()
 		if (whitespace_p(n)) break
-        if (n === '(') throw 'unexpected opening parenthesis'
+		else if (n === '(') throw 'unexpected opening parenthesis'
 		else if (n === ')') {
 			stream.rollback()
 			break
-		}
-		else x += n
+		} else x += n
 	}
 	return x
 }
@@ -87,8 +86,7 @@ function whitespace_p(x) {
 function skip_whitespace(stream) {
 	while(!stream.complete()) {
 		let x = stream.next()
-		if (x === StopIteration) break
-		else if (whitespace_p(x)) continue
+		if (whitespace_p(x)) continue
 		else return stream.rollback()
 	}
 }
