@@ -1,129 +1,124 @@
 const I = x => x
 const W = f => x => f(x)(x)
+
 const wrap = (first, last) => x => first + x + last
 const wrap_parentheses = wrap('(', ')')
 const wrap_braces = wrap('{', '}')
 const wrap_brackets = wrap('[', ']')
+const wrap_quotes = wrap('"', '"')
+const wrap_spaces = wrap(' ', ' ')
 
-function repeat_string(string, times) {
-    let big = ''
-    for (let i = 0; i < times; i++) big += string
-    return big
+String.prototype.replaceAll = function(from, to){
+	return this.replace(new RegExp(from, 'g'), to)
 }
 
-function serialise_function_body(x) {
-    return wrap_braces(x.map(serialise))
+function make_string(string, times) {
+	let big = ''
+	for (let i = 0; i < times; i++) big += string
+	return big
 }
 
-function serialise_function_arguments(x) {
-    return wrap_parentheses(x.join(','))
-}
+const listp = x => x.constructor === Array
+const stringp = x => x.constructor === String
 
-function serialise_function(x) {
-    return 'function ' + x[1] +
-        serialise_function_arguments(x[2]) +
-        serialise_function_body(x.slice([3]))
-}
-
-function serialise_curried_function(x) {
-    return 'function ' +
-        x[2] +
-        x[3].map(wrap_parentheses).join('{return function') +
-        serialise_function_body(x.slice(4)) +
-        repeat_string('}', x[3].length - 1)
-}
-
-function serialise_lambda(x) {
+function map_pairwise(f, x) {
 	const xs = []
-	xs.push((function() { switch(x[1].length) {
-		case 0: return '()'
-		case 1: return x[1][0]
-		default: return wrap_parentheses(x[1].join(','))
-	}})())
-	xs.push('=>')
-	xs.push(serialise(x[2]))
-	return xs.join('')
+	for (let i = 0; i < x.length; i += 2)
+		xs.push(f(x[i], x[i+1]))
+	return xs
 }
 
-function serialise_object(x) {
-	const xs = []
-	let even = true
-	for (const y of x.slice(1)) {
-		if (even) {
-			xs.push(y)
-			xs.push(': ')
-			even = false
-		} else {
-			xs.push(serialise(y))
-			xs.push(', ')
-			even = true
-		}
-	}
-	return wrap_braces(xs.join(''))
-}
-
-function serialise_array(x) {
-    return wrap_brackets(x.slice(1).map(serialise).join(', '))
+function serialise(x) {
+	if (listp(x)) return serialise_expression(x)
+	else if (stringp(x)) return x
 }
 
 function serialise_call(x) {
 	return x[0] + wrap_parentheses(x.slice(1).map(serialise).join(', '))
 }
 
-function serialise_sum(x) {
-	return x.slice(1).map(serialise).join('+')
-}
-
-function serialise_pipe(x) {
-    return x.slice(1).reverse().map(serialise).join('(') + repeat_string(')', x.length - 2)
-}
-
-function serialise_comp(x) {
-    return '__x=>' + [ ...x.slice(1).reverse().map(serialise), '__x'].join('(') + repeat_string(')', x.length - 1)
-}
-
-function serialise_return(x) {
-	return 'return ' + x.slice(1).map(serialise)
+function serialise_string(x) {
+	return wrap_quotes(x.slice(1).join(' ').replaceAll('"', '\\"'))
 }
 
 function serialise_var(x) {
-	return 'var ' + x[1] + '=' + serialise(x[2])
+	return x[0] + ' ' + map_pairwise((name, value) => name + ' = ' + serialise(value), x.slice(1)).join(', ')
 }
 
-function serialise_const(x) {
-	return 'const ' + x[1] + '=' + serialise(x[2])
+function serialise_function(x) {
+	const xs = []
+	let body = 2
+	xs.push(x[0])
+	if (stringp(x[1])) {
+		xs.push(x[1])
+		body = 3
+	}
+	xs.push(wrap_parentheses(x[body-1].join(', ')))
+	xs.push(wrap_braces(x.slice(body).map(serialise).join(';')))
+	return xs.join(' ')
 }
 
-function serialise_nested(x) {
-    return serialise(x[0]) + x.slice(1).map(serialise).map(wrap_parentheses)
+function serialise_arrow(x) {
+	const xs = []
+	if (stringp(x[1]))
+		xs.push(x[1])
+	else if (listp(x[1]))
+		xs.push(wrap_parentheses(x[1].join(', ')))
+	xs.push('=>')
+	if (x.length === 3)
+		xs.push(serialise(x[2]))
+	else
+		xs.push(x.slice(1).map(serialise).join(';'))
+	return xs.join(' ')
 }
 
-function serialise_apply(x) {
-    return x[1] + x.slice(2).map(serialise).map(wrap_parentheses).join('')
+function serialise_infix(x, infix=null) {
+	return x.slice(1).map(serialise).join(wrap_spaces(infix ?? x[0]))
 }
 
-function choose_serialisation_function(x) {
-	if (x.constructor === Array) {
-        if (x[0].constructor === Array)
-            return serialise_nested
-		switch (x[0]) {
-			case 'function': return serialise_function
-			case 'curried': return serialise_curried_function
-			case 'lambda': return serialise_lambda
-			case 'object': return serialise_object
-			case 'array': return serialise_array
-			case 'return': return serialise_return
-			case '+': return serialise_sum
-			case 'pipe': return serialise_pipe
-			case 'comp': return serialise_comp
-			case 'var': return serialise_var
-			case 'const': return serialise_const
-            case 'apply': return serialise_apply
-			default: return serialise_call
-		}
-	} else return I
+function serialise_if(x) {
+	return map_pairwise(
+		(a, b) => [a, '?', b, ':'].join(' '),
+		x.slice(1, -1).map(serialise))
+	.join(' ') + ' ' + serialise(x[x.length-1])
 }
 
-const serialise = W(choose_serialisation_function)
+function serialise_for(x) {
+	return 'for ' + wrap_parentheses('const ' + serialise(x[1]) + ' of ' + serialise(x[2])) + wrap_braces(x.slice(3).map(serialise).join(';'))
+}
+
+function serialise_array(x) {
+	return wrap_brackets(x.slice(1).map(serialise).join(','))
+}
+
+function serialise_while(x) {
+	return 'while ' + wrap_parentheses(serialise(x[1])) + wrap_braces(x.slice(2).map(serialise).join(';'))
+}
+
+function serialise_expression(x) {
+	switch (x[0]) {
+		case "'": return serialise_string(x)
+		case 'array': return serialise_array(x)
+		case 'object': return serialise_object(x)
+		case 'const':
+		case 'let':
+		case 'var': return serialise_var(x)
+		case 'function': return serialise_function(x)
+		case 'lambda': return serialise_arrow(x)
+		case '*':
+		case '+':
+		case '/':
+		case '-':
+		case '**': return serialise_infix(x)
+		case 'and': return serialise_infix(x, '&&')
+		case 'or': return serialise_infix(x, '||')
+		case '=': return serialise_infix(x, '===')
+		case '!=': return serialise_infix(x, '!==')
+		case 'if': return serialise_if(x)
+		case 'for': return serialise_for(x)
+		case 'while': return serialise_while(x)
+		default: return serialise_call(x)
+	}
+}
 
 module.exports = serialise

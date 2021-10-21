@@ -1,18 +1,21 @@
-(function myfunction (a b)
-    (return (console.log (+ a b))))
+(console.log (' Yo Bro))
 
-(console.log (array "memes" "beams"))
+(var x 1 y (' I like quotes "))
+(const x 1 y (' I like quotes "))
 
-(console.log (object "name" "Vas" "surname" "Pas"))
+(function test (x y) (return (console.log x y)))
 
-(const incr (lambda (x) (+ 1 x)))
+(const test2 (function (x) (return x)))
 
-(const add (lambda (a) (lambda (b) (+ a b))))
+(const test3 (lambda x (and 1 2 x)))
 
-(curried function add3nums (a b c) (return (+ a b c)))
+(if
+    (= test3 1) 1
+    (= test3 2) 2
+    3)
 
-(const add3 (comp (add 1) (add 2)))
+(for x (array 1 2 3) (console.log x))
 
-(pipe 1 (add 1) (add 2) (add -34) add3 console.log)
-
-(console.log (apply add3nums 1 2 3))
+(while true
+    (console.log 1)
+    (console.log 2))

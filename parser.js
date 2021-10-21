@@ -1,4 +1,6 @@
 const StopIteration = Symbol()
+const WHITESPACE = [' ', '\n', '\t']
+const ATOM_STOP = [...WHITESPACE, '(', ')']
 
 class ParserStream {
 	constructor(xs) {
@@ -8,7 +10,12 @@ class ParserStream {
 	}
 
 	next() {
-		if (this.i < this.length) return this.xs[this.i++]
+		if (!this.done()) return this.xs[this.i++]
+		else return StopIteration
+	}
+
+	peek() {
+		if (!this.done()) return this.xs[this.i]
 		else return StopIteration
 	}
 
@@ -17,78 +24,73 @@ class ParserStream {
 		return this
 	}
 
-	skip(i=1) {
-		this.i += i
-		return this
-	}
-
-	complete() {
+	done() {
 		return this.i >= this.length
 	}
+
+	until(f) {
+		while (true) {
+			const x = this.next()
+			if (x === StopIteration) break
+			else if (f(x)) { this.rollback() ; break }
+		}
+		return this
+	}
 }
 
-function parser(string) {
+function main(string) {
 	const stream = new ParserStream(string)
-	return Array.from(list_or_value_stream(stream))
+	return Array.from(sexp_stream(stream))
 }
 
-function* list_or_value_stream(stream) {
-	let x = list_or_value(stream)
-	while (x !== StopIteration) {
-		yield x
-		x = list_or_value(stream)
+function* sexp_stream(stream) {
+	while (true) {
+		const x = sexp(stream)
+		if (x === StopIteration) break
+		else yield x
 	}
 }
 
-function list_or_value(stream) {
-	skip_whitespace(stream)
-	const x = stream.next()
-	if (x === StopIteration) return x
-	stream.rollback()
-	if (x === '(') return list(stream)
-	else if (x === ')') 'unexpected closing parenthesis'
-	else return value(stream)
+function sexp(stream) {
+	stream.until(x => !WHITESPACE.includes(x))
+	switch (stream.peek()) {
+		case StopIteration: return StopIteration
+		case '(': return expression(stream)
+		case ')': throw 'unexpected closing parenthesis'
+		default: return atom(stream)
+	}
 }
 
-function list(stream) {
+function expression(stream) {
 	const xs = []
-	let x = stream.next()
-	if (x !== '(') throw 'no opening parenthesis found but expected a list'
-	while(!stream.complete()) {
-		x = stream.next()
-		if (x === ')') return xs
-		stream.rollback()
-		x = list_or_value(stream)
+	const x = stream.next()
+	if (x !== '(') throw 'no opening parenthesis found but expected one'
+	while(true) {
+		const x = stream.next()
 		if (x === StopIteration) throw 'no closing parethesis but expected one'
-		xs.push(x)
-	}
-	throw 'no closing parethesis but expected one'
-}
-
-function value(stream) {
-	let x = ''
-	while (!stream.complete()) {
-		const n = stream.next()
-		if (whitespace_p(n)) break
-		else if (n === '(') throw 'unexpected opening parenthesis'
-		else if (n === ')') {
+		else if (x === ')') return xs
+		else {
 			stream.rollback()
-			break
-		} else x += n
-	}
-	return x
-}
-
-function whitespace_p(x) {
-	return [' ', '\n', '\t'].includes(x)
-}
-
-function skip_whitespace(stream) {
-	while(!stream.complete()) {
-		let x = stream.next()
-		if (whitespace_p(x)) continue
-		else return stream.rollback()
+			const x = sexp(stream)
+			if (x === StopIteration) throw 'no closing parethesis but expected one'
+			else xs.push(x)
+		}
 	}
 }
 
-module.exports = parser
+function atom(stream) {
+	let xs = ''
+	while (true) {
+		const x = stream.next()
+		if (x === StopIteration) return xs
+		else if (x === '\\') {
+			if (stream.done()) xs += x
+			else xs += stream.next()
+		} else if (ATOM_STOP.includes(x)) {
+			stream.rollback()
+			return xs
+		} else xs += x
+	}
+}
+
+module.exports = main
