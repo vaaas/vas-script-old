@@ -23,3 +23,5 @@
 (const my_set (new Set (array 1 2 3 4 5 6)))
 
 (set my_set prototype 1)
+
+(function my-map (xs) (xs.map (function (x) (+ 1 x))))
