@@ -7,7 +7,7 @@
 
 (const test2 (function (x) (return x)))
 
-(const test3 (lambda x (and 1 2 x)))
+(const test3 (function (x) (and 1 2 x)))
 
 (if
     (= test3 1) 1
@@ -19,3 +19,7 @@
 (while true
     (console.log 1)
     (console.log 2))
+
+(const my_set (new Set (array 1 2 3 4 5 6)))
+
+(set my_set prototype 1)
