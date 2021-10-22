@@ -25,3 +25,5 @@
 (set my_set prototype 1)
 
 (function my-map (xs) (xs.map (function (x) (+ 1 x))))
+
+((function (x) (+ x (' yo))) (' test))

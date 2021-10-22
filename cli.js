@@ -115,8 +115,14 @@ function serialise_set(x) {
 		return x.slice(1, x.length-1).map(serialise).join('.') + ' = ' + serialise(last(x))
 }
 
+function serialise_nested(x) {
+	console.log(first(x))
+	return wrap_parentheses(serialise(first(x))) + wrap_parentheses(tail(x).map(serialise))
+}
+
 function serialise_expression(x) {
-	switch (first(x)) {
+	if (listp(first(x))) return serialise_nested(x)
+	else if (stringp(first(x))) switch (first(x)) {
 		case "'": return serialise_string(x)
 		case 'array': return serialise_array(x)
 		case 'object': return serialise_object(x)
