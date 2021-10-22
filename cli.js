@@ -1,8 +1,50 @@
+'use strict'
+
 const fs = require('fs')
 const parser = require('./parser.js')
 
+class Macro {
+	constructor(sexp) {
+		this.symbol
+	}
+}
+
+class Sexp {
+	constructor(sexp) {
+		this.sexp = sexp
+	}
+
+	toString() {
+		return serialise(this.sexp)
+	}
+}
+
+class Scope {
+	constructor(parent=null, sexps=[]) {
+		this.parent = parent
+		this.sexps = []
+		for (const x of sexps)
+			this.add_sexp(x)
+	}
+
+	add_sexp(x) {
+		this.sexps.push(x)
+		return this
+	}
+
+	toString() {
+		return this.sexps.map(x => x.toString()).join('\n')
+	}
+}
+
 const I = x => x
 const W = f => x => f(x)(x)
+const N = o => x => new o(x)
+
+const str = x => ''+x
+const concat_arrays = xs => xs.reduce((xs, x) => { for (const i of x) xs.push(i) ; return xs }, [])
+const pipe = (x, ...fs) => { let a = x ; for (const f of fs) a = f(a) ; return a }
+const map = f => x => x.map(f)
 
 const wrap = (first, last) => x => first + x + last
 const wrap_parentheses = wrap('(', ')')
@@ -30,6 +72,7 @@ function make_string(string, times) {
 
 const listp = x => x.constructor === Array
 const stringp = x => x.constructor === String
+const numberp = x => !Number.isNaN(parseFloat(x))
 
 function map_pairwise(f, x) {
 	const xs = []
@@ -115,8 +158,11 @@ function serialise_set(x) {
 		return x.slice(1, x.length-1).map(serialise).join('.') + ' = ' + serialise(last(x))
 }
 
+function serialise_get(x) {
+	return serialise(second(x)) + x.slice(2).map(y => wrap_brackets(serialise(y))).join('')
+}
+
 function serialise_nested(x) {
-	console.log(first(x))
 	return wrap_parentheses(serialise(first(x))) + wrap_parentheses(tail(x).map(serialise))
 }
 
@@ -145,12 +191,20 @@ function serialise_expression(x) {
 		case 'return': return serialise_return(x)
 		case 'new': return serialise_new(x)
 		case 'set': return serialise_set(x)
+		case 'get': return serialise_get(x)
 		default: return serialise_call(x)
 	}
 }
 
 function main(file) {
-	console.log(parser(fs.readFileSync(file).toString()).map(serialise).join('\n'))
+	const GlobalScope = pipe(
+		file,
+		fs.readFileSync,
+		x => x.toString(),
+		parser,
+		map(N(Sexp)),
+		x => new Scope(null, x))
+	console.log(GlobalScope.toString())
 }
 
 main(...process.argv.slice(2))
