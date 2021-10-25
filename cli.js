@@ -3,12 +3,6 @@
 const fs = require('fs')
 const parser = require('./parser.js')
 
-const I = x => x
-const W = f => x => f(x)(x)
-const N = o => x => new o(x)
-
-const str = x => ''+x
-const concat_arrays = xs => xs.reduce((xs, x) => { for (const i of x) xs.push(i) ; return xs }, [])
 const pipe = (x, ...fs) => { let a = x ; for (const f of fs) a = f(a) ; return a }
 const map = f => x => x.map(f)
 
@@ -22,23 +16,17 @@ const wrap_spaces = wrap(' ', ' ')
 const first = x => x[0]
 const second = x => x[1]
 const third = x => x[2]
-const head = x => x.slice(0, x.length -1)
 const tail = x => x.slice(1)
 const last = x => x[x.length - 1]
+
+const tap = f => x => { f(x) ; return x }
 
 String.prototype.replaceAll = function(from, to){
 	return this.replace(new RegExp(from, 'g'), to)
 }
 
-function make_string(string, times) {
-	let big = ''
-	for (let i = 0; i < times; i++) big += string
-	return big
-}
-
 const listp = x => x.constructor === Array
 const stringp = x => x.constructor === String
-const numberp = x => !Number.isNaN(parseFloat(x))
 
 function map_pairwise(f, x) {
 	const xs = []
@@ -130,6 +118,10 @@ function serialise_get(x) {
 
 function serialise_nested(x) {
 	return wrap_parentheses(serialise(first(x))) + wrap_parentheses(tail(x).map(serialise))
+}
+
+function serialise_object(x) {
+    return wrap_braces(map_pairwise((k, v) => k + ': ' + serialise(v), tail(x)).join(', '))
 }
 
 function serialise_expression(x) {

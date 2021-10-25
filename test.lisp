@@ -1,11 +1,8 @@
 (console.log (' Yo Bro))
-
-(var x 1 y (' I like quotes "))
-(const x 1 y (' I like quotes "))
-
 (function test (x y) (return (console.log x y)))
-
-(const test2 (function (x) (return x)))
+; yo bro
+(const test2 ; (function (x) (return x)))
+    (array 1 2 3))
 
 (const test3 (function (x) (and 1 2 x)))
 
@@ -29,3 +26,5 @@
 ((function (x) (+ x (' yo))) (' test))
 
 (get x 1 x 3 (' yo))
+
+(console.log (object memes (' beams)))
