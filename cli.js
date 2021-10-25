@@ -35,28 +35,28 @@ function map_pairwise(f, x) {
 	return xs
 }
 
-function serialise(x) {
-	if (listp(x)) return serialise_expression(x)
+function serialise(x, macros) {
+	if (listp(x)) return serialise_expression(x, macros)
 	else if (stringp(x)) return x
 }
 
-function serialise_call(x) {
-	return first(x) + wrap_parentheses(tail(x).map(serialise).join(', '))
+function serialise_call(x, macros) {
+	return first(x) + wrap_parentheses(tail(x).map(x => serialise(x, macros)).join(', '))
 }
 
-function serialise_string(x) {
+function serialise_string(x, macros) {
 	return wrap_quotes(tail(x).join(' ').replaceAll('"', '\\"'))
 }
 
-function serialise_var(x) {
+function serialise_var(x, macros) {
 	return first(x) + ' ' +
-		map_pairwise((name, value) => name + ' = ' + serialise(value), tail(x)).join(', ')
+		map_pairwise((name, value) => name + ' = ' + serialise(value, macros), tail(x)).join(', ')
 }
 
-function serialise_function(x) {
+function serialise_function(x, macros) {
 	let xs = ''
 	let body = 2
-	xs += first(x) + ' '
+	xs += 'function '
 	if (stringp(second(x))) {
 		xs += second(x)
 		body = 3
@@ -66,103 +66,109 @@ function serialise_function(x) {
 	const lb = last(body)
 	if (stringp(lb) || (listp(lb) && first(lb) !== 'return'))
 		body[body.length-1] = ['return', lb]
-	xs += wrap_braces(body.map(serialise).join('; '))
+	xs += wrap_braces(body.map(x => serialise(x, macros)).join('; '))
 	return xs
 }
 
-function serialise_infix(x, infix=null) {
-	return tail(x).map(serialise).join(wrap_spaces(infix ?? first(x)))
+function serialise_infix(x, macros, infix=null) {
+	return tail(x).map(x => serialise(x, macros)).join(wrap_spaces(infix ?? first(x)))
 }
 
-function serialise_if(x) {
+function serialise_if(x, macros) {
 	return map_pairwise(
 		(a, b) => [a, '?', b, ':'].join(' '),
-		x.slice(1, -1).map(serialise))
-	.join(' ') + ' ' + serialise(last(x))
+		x.slice(1, -1).map(x => serialise(x, macros))
+	).join(' ') + ' ' + serialise(last(x), macros)
 }
 
-function serialise_for(x) {
+function serialise_for(x, macros) {
 	return 'for ' +
-		wrap_parentheses('const ' + second(x) + ' of ' + serialise(third(x))) +
-		wrap_braces(x.slice(3).map(serialise).join('; '))
+		wrap_parentheses('const ' + second(x) + ' of ' + serialise(third(x), macros)) +
+		wrap_braces(x.slice(3).map(x => serialise(x, macros)).join('; '))
 }
 
-function serialise_array(x) {
-	return wrap_brackets(tail(x).map(serialise).join(', '))
+function serialise_array(x, macros) {
+	return wrap_brackets(tail(x).map(x => serialise(x, macros)).join(', '))
 }
 
-function serialise_while(x) {
-	return 'while ' + wrap_parentheses(serialise(second(x))) + wrap_braces(x.slice(2).map(serialise).join('; '))
+function serialise_while(x, macros) {
+	return 'while ' + wrap_parentheses(serialise(second(x), macros)) + wrap_braces(x.slice(2).map(x => serialise(x, macros)).join('; '))
 }
 
-function serialise_return(x) {
-	return first(x) + ' ' + tail(x).map(serialise).join(',')
+function serialise_return(x, macros) {
+	return first(x) + ' ' + tail(x).map(x => serialise(x, macros)).join(',')
 }
 
-function serialise_new(x) {
+function serialise_new(x, macros) {
 	return first(x) + ' ' +
-		serialise(second(x)) +
-		wrap_parentheses(x.slice(2).map(serialise))
+		serialise(second(x), macros) +
+		wrap_parentheses(x.slice(2).map(x => serialise(x, macros)))
 }
 
-function serialise_set(x) {
+function serialise_set(x, macros) {
 	if (x.length === 2)
-		return serialise(x) + ' = null'
+		return serialise(x, macros) + ' = null'
 	else if (x.length > 2)
-		return x.slice(1, x.length-1).map(serialise).join('.') + ' = ' + serialise(last(x))
+		return x.slice(1, x.length-1).map(x => serialise(x, macros)).join('.') + ' = ' + serialise(last(x), macros)
 }
 
-function serialise_get(x) {
-	return serialise(second(x)) + x.slice(2).map(y => wrap_brackets(serialise(y))).join('')
+function serialise_get(x, macros) {
+	return serialise(second(x), macros) + x.slice(2).map(y => wrap_brackets(serialise(y, macros))).join('')
 }
 
-function serialise_nested(x) {
-	return wrap_parentheses(serialise(first(x))) + wrap_parentheses(tail(x).map(serialise))
+function serialise_dot(x, macros) {
+	return [ serialise(second(x), macros), ...x.slice(2) ].join('.')
 }
 
-function serialise_object(x) {
-    return wrap_braces(map_pairwise((k, v) => k + ': ' + serialise(v), tail(x)).join(', '))
+function serialise_nested(x, macros) {
+	return wrap_parentheses(serialise(first(x), macros)) + wrap_parentheses(tail(x).map(x => serialise(x, macros)))
 }
 
-function serialise_expression(x) {
-	if (listp(first(x))) return serialise_nested(x)
+function serialise_object(x, macros) {
+	return wrap_braces(map_pairwise((k, v) => k + ': ' + serialise(v, macros), tail(x)).join(', '))
+}
+
+function serialise_expression(x, macros) {
+	// x = macroexpand(x)
+	if (listp(first(x))) return serialise_nested(x, macros)
 	else if (stringp(first(x))) switch (first(x)) {
-		case "'": return serialise_string(x)
-		case 'array': return serialise_array(x)
-		case 'object': return serialise_object(x)
+		case "'": return serialise_string(x, macros)
+		case 'array': return serialise_array(x, macros)
+		case 'object': return serialise_object(x, macros)
 		case 'const':
 		case 'let':
-		case 'var': return serialise_var(x)
-		case 'function': return serialise_function(x)
+		case 'var': return serialise_var(x, macros)
+		case 'macro':
+		case 'function': return serialise_function(x, macros)
 		case '*':
 		case '+':
 		case '/':
 		case '-':
-		case '**': return serialise_infix(x)
-		case 'and': return serialise_infix(x, '&&')
-		case 'or': return serialise_infix(x, '||')
-		case '=': return serialise_infix(x, '===')
-		case '!=': return serialise_infix(x, '!==')
-		case 'if': return serialise_if(x)
-		case 'for': return serialise_for(x)
-		case 'while': return serialise_while(x)
-		case 'return': return serialise_return(x)
-		case 'new': return serialise_new(x)
-		case 'set': return serialise_set(x)
-		case 'get': return serialise_get(x)
-		default: return serialise_call(x)
+		case '**': return serialise_infix(x, macros)
+		case 'and': return serialise_infix(x, macros, '&&')
+		case 'or': return serialise_infix(x, macros, '||')
+		case '=': return serialise_infix(x, macros, '===')
+		case '!=': return serialise_infix(x, macros, '!==')
+		case 'if': return serialise_if(x, macros)
+		case 'for': return serialise_for(x, macros)
+		case 'while': return serialise_while(x, macros)
+		case 'return': return serialise_return(x, macros)
+		case 'new': return serialise_new(x, macros)
+		case 'set': return serialise_set(x, macros)
+		case 'get': return serialise_get(x, macros)
+		case '.': return serialise_dot(x, macros)
+		default: return serialise_call(x, macros)
 	}
 }
 
 function main(file) {
-	pipe(
-		file,
-		fs.readFileSync,
-		x => x.toString(),
-		parser,
-		map(serialise),
-		x => x.join('\n'),
-		console.log)
+	const xs = pipe(file, fs.readFileSync, x => x.toString(), parser)
+	const macros = xs.filter(x => listp(x) && (first(x) === 'macro'))
+		.reduce((xs, x) => {
+			xs[second(x)] = serialise(x, xs)
+			return xs
+		}, {})
+	console.log(xs.map(x => serialise(x, macros)).join('\n'))
 }
 
 main(...process.argv.slice(2))

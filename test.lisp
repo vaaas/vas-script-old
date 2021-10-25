@@ -1,8 +1,13 @@
+(macro pipe (x ...fs)
+	(let result x)
+	(for f fs (set result (array f result)))
+	result)
+
 (console.log (' Yo Bro))
 (function test (x y) (return (console.log x y)))
 ; yo bro
 (const test2 ; (function (x) (return x)))
-    (array 1 2 3))
+	(array 1 2 3))
 
 (const test3 (function (x) (and 1 2 x)))
 
