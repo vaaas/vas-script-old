@@ -3,40 +3,6 @@
 const fs = require('fs')
 const parser = require('./parser.js')
 
-class Macro {
-	constructor(sexp) {
-		this.symbol
-	}
-}
-
-class Sexp {
-	constructor(sexp) {
-		this.sexp = sexp
-	}
-
-	toString() {
-		return serialise(this.sexp)
-	}
-}
-
-class Scope {
-	constructor(parent=null, sexps=[]) {
-		this.parent = parent
-		this.sexps = []
-		for (const x of sexps)
-			this.add_sexp(x)
-	}
-
-	add_sexp(x) {
-		this.sexps.push(x)
-		return this
-	}
-
-	toString() {
-		return this.sexps.map(x => x.toString()).join('\n')
-	}
-}
-
 const I = x => x
 const W = f => x => f(x)(x)
 const N = o => x => new o(x)
@@ -197,14 +163,14 @@ function serialise_expression(x) {
 }
 
 function main(file) {
-	const GlobalScope = pipe(
+	pipe(
 		file,
 		fs.readFileSync,
 		x => x.toString(),
 		parser,
-		map(N(Sexp)),
-		x => new Scope(null, x))
-	console.log(GlobalScope.toString())
+		map(serialise),
+		x => x.join('\n'),
+		console.log)
 }
 
 main(...process.argv.slice(2))
