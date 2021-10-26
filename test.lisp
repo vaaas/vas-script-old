@@ -1,35 +1,22 @@
 (macro pipe (x ...fs)
-	(let result x)
-	(for f fs (set result (array f result)))
-	result)
+	(let r x)
+	(for f fs (set r (array f r)))
+	r)
 
-(console.log (' Yo Bro))
-(function test (x y) (return (console.log x y)))
-; yo bro
-(const test2 ; (function (x) (return x)))
-	(array 1 2 3))
+(macro arrow (...fs)
+	(let r (' x))
+	(for f fs (set r (array f r)))
+	(array (' function) (array (' x)) r))
 
-(const test3 (function (x) (and 1 2 x)))
+(function add (a) (function (b) (+ a b)))
+(const inc (add 1))
+(function divisible (a) (function (b) (= 0 (% b a))))
+(const even (divisible 2))
+(function filter (f) (function (x) ((. x filter) f)))
+(function map (f) (function (x) ((. x map) f)))
 
-(if
-	(= test3 1) 1
-	(= test3 2) 2
-	3)
+(pipe 1 inc even console.log)
+(const solution (arrow inc even console.log))
 
-(for x (array 1 2 3) (console.log x))
-
-(while true
-	(console.log 1)
-	(console.log 2))
-
-(const my_set (new Set (array 1 2 3 4 5 6)))
-
-(set my_set prototype 1)
-
-(function my-map (xs) (xs.map (function (x) (+ 1 x))))
-
-((function (x) (+ x (' yo))) (' test))
-
-(get x 1 x 3 (' yo))
-
-(console.log (object memes (' beams)))
+(pipe (array 1 2 3) (map inc) (filter even) console.log)
+(const solution2 (arrow (map inc) (filter even) console.log))

@@ -21,12 +21,14 @@ const last = x => x[x.length - 1]
 
 const tap = f => x => { f(x) ; return x }
 
-String.prototype.replaceAll = function(from, to){
+String.prototype.replaceAll = function(from, to) {
 	return this.replace(new RegExp(from, 'g'), to)
 }
 
 const listp = x => x.constructor === Array
 const stringp = x => x.constructor === String
+
+const plus = (f, a) => b => f(b, a)
 
 function map_pairwise(f, x) {
 	const xs = []
@@ -41,7 +43,7 @@ function serialise(x, macros) {
 }
 
 function serialise_call(x, macros) {
-	return first(x) + wrap_parentheses(tail(x).map(x => serialise(x, macros)).join(', '))
+	return first(x) + wrap_parentheses(tail(x).map(plus(serialise, macros)).join(', '))
 }
 
 function serialise_string(x, macros) {
@@ -66,50 +68,50 @@ function serialise_function(x, macros) {
 	const lb = last(body)
 	if (stringp(lb) || (listp(lb) && first(lb) !== 'return'))
 		body[body.length-1] = ['return', lb]
-	xs += wrap_braces(body.map(x => serialise(x, macros)).join('; '))
+	xs += wrap_braces(body.map(plus(serialise, macros)).join('; '))
 	return xs
 }
 
 function serialise_infix(x, macros, infix=null) {
-	return tail(x).map(x => serialise(x, macros)).join(wrap_spaces(infix ?? first(x)))
+	return tail(x).map(plus(serialise, macros)).join(wrap_spaces(infix ?? first(x)))
 }
 
 function serialise_if(x, macros) {
 	return map_pairwise(
 		(a, b) => [a, '?', b, ':'].join(' '),
-		x.slice(1, -1).map(x => serialise(x, macros))
+		x.slice(1, -1).map(plus(serialise, macros))
 	).join(' ') + ' ' + serialise(last(x), macros)
 }
 
 function serialise_for(x, macros) {
 	return 'for ' +
 		wrap_parentheses('const ' + second(x) + ' of ' + serialise(third(x), macros)) +
-		wrap_braces(x.slice(3).map(x => serialise(x, macros)).join('; '))
+		wrap_braces(x.slice(3).map(plus(serialise, macros)).join('; '))
 }
 
 function serialise_array(x, macros) {
-	return wrap_brackets(tail(x).map(x => serialise(x, macros)).join(', '))
+	return wrap_brackets(tail(x).map(plus(serialise, macros)).join(', '))
 }
 
 function serialise_while(x, macros) {
-	return 'while ' + wrap_parentheses(serialise(second(x), macros)) + wrap_braces(x.slice(2).map(x => serialise(x, macros)).join('; '))
+	return 'while ' + wrap_parentheses(serialise(second(x), macros)) + wrap_braces(x.slice(2).map(plus(serialise, macros)).join('; '))
 }
 
 function serialise_return(x, macros) {
-	return first(x) + ' ' + tail(x).map(x => serialise(x, macros)).join(',')
+	return first(x) + ' ' + tail(x).map(plus(serialise, macros)).join(',')
 }
 
 function serialise_new(x, macros) {
 	return first(x) + ' ' +
 		serialise(second(x), macros) +
-		wrap_parentheses(x.slice(2).map(x => serialise(x, macros)))
+		wrap_parentheses(x.slice(2).map(plus(serialise, macros)))
 }
 
 function serialise_set(x, macros) {
 	if (x.length === 2)
 		return serialise(x, macros) + ' = null'
 	else if (x.length > 2)
-		return x.slice(1, x.length-1).map(x => serialise(x, macros)).join('.') + ' = ' + serialise(last(x), macros)
+		return x.slice(1, x.length-1).map(plus(serialise, macros)).join('.') + ' = ' + serialise(last(x), macros)
 }
 
 function serialise_get(x, macros) {
@@ -121,15 +123,28 @@ function serialise_dot(x, macros) {
 }
 
 function serialise_nested(x, macros) {
-	return wrap_parentheses(serialise(first(x), macros)) + wrap_parentheses(tail(x).map(x => serialise(x, macros)))
+	return wrap_parentheses(serialise(first(x), macros)) + wrap_parentheses(tail(x).map(plus(serialise, macros)))
 }
 
 function serialise_object(x, macros) {
 	return wrap_braces(map_pairwise((k, v) => k + ': ' + serialise(v, macros), tail(x)).join(', '))
 }
 
+function serialise_spread(x, macros) {
+	return '...' + wrap_parentheses(tail(x).map(serialise))
+}
+
+function macroexpand(x, macros) {
+	if (listp(x)) {
+		x = x.map(macroexpand)
+		const f = macros[first(x)]
+		if (!f) return x
+		else return f(...tail(x))
+	} else return x
+}
+
 function serialise_expression(x, macros) {
-	// x = macroexpand(x)
+	x = macroexpand(x, macros)
 	if (listp(first(x))) return serialise_nested(x, macros)
 	else if (stringp(first(x))) switch (first(x)) {
 		case "'": return serialise_string(x, macros)
@@ -138,12 +153,13 @@ function serialise_expression(x, macros) {
 		case 'const':
 		case 'let':
 		case 'var': return serialise_var(x, macros)
-		case 'macro':
+		case 'macro': return ''
 		case 'function': return serialise_function(x, macros)
 		case '*':
 		case '+':
 		case '/':
 		case '-':
+		case '%':
 		case '**': return serialise_infix(x, macros)
 		case 'and': return serialise_infix(x, macros, '&&')
 		case 'or': return serialise_infix(x, macros, '||')
@@ -157,6 +173,7 @@ function serialise_expression(x, macros) {
 		case 'set': return serialise_set(x, macros)
 		case 'get': return serialise_get(x, macros)
 		case '.': return serialise_dot(x, macros)
+		case '...': return serialise_spread(x, macros)
 		default: return serialise_call(x, macros)
 	}
 }
@@ -165,10 +182,11 @@ function main(file) {
 	const xs = pipe(file, fs.readFileSync, x => x.toString(), parser)
 	const macros = xs.filter(x => listp(x) && (first(x) === 'macro'))
 		.reduce((xs, x) => {
-			xs[second(x)] = serialise(x, xs)
+			xs[second(x)] = eval(wrap_parentheses(serialise_function(x, xs)))
 			return xs
 		}, {})
-	console.log(xs.map(x => serialise(x, macros)).join('\n'))
+	console.log(Object.values(macros).map(x => x.toString()))
+	console.log(xs.map(plus(serialise, macros)).join('\n'))
 }
 
 main(...process.argv.slice(2))
