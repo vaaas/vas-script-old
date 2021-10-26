@@ -186,7 +186,7 @@ function main(file) {
 			return xs
 		}, {})
 	console.log(Object.values(macros).map(x => x.toString()))
-	console.log(xs.map(plus(serialise, macros)).join('\n'))
+	console.log(xs.map(plus(serialise, macros)).filter(x => x.length > 0).join('\n'))
 }
 
 main(...process.argv.slice(2))
