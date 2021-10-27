@@ -30,6 +30,10 @@ const stringp = x => x.constructor === String
 
 const plus = (f, a) => b => f(b, a)
 
+function escape(x) {
+	return x.replaceAll('-', '_')
+}
+
 function map_pairwise(f, x) {
 	const xs = []
 	for (let i = 0; i < x.length; i += 2)
@@ -39,11 +43,11 @@ function map_pairwise(f, x) {
 
 function serialise(x, macros) {
 	if (listp(x)) return serialise_expression(x, macros)
-	else if (stringp(x)) return x
+	else if (stringp(x)) return escape(x)
 }
 
 function serialise_call(x, macros) {
-	return first(x) + wrap_parentheses(tail(x).map(plus(serialise, macros)).join(', '))
+	return serialise(first(x)) + wrap_parentheses(tail(x).map(plus(serialise, macros)).join(', '))
 }
 
 function serialise_string(x, macros) {
@@ -52,7 +56,7 @@ function serialise_string(x, macros) {
 
 function serialise_var(x, macros) {
 	return first(x) + ' ' +
-		map_pairwise((name, value) => name + ' = ' + serialise(value, macros), tail(x)).join(', ')
+		map_pairwise((name, value) => serialise(name) + ' = ' + serialise(value, macros), tail(x)).join(', ')
 }
 
 function serialise_function(x, macros) {
@@ -60,7 +64,7 @@ function serialise_function(x, macros) {
 	let body = 2
 	xs += 'function '
 	if (stringp(second(x))) {
-		xs += second(x)
+		xs += serialise(second(x))
 		body = 3
 	}
 	xs += wrap_parentheses(x[body-1].join(', '))
@@ -85,7 +89,7 @@ function serialise_if(x, macros) {
 
 function serialise_for(x, macros) {
 	return 'for ' +
-		wrap_parentheses('const ' + second(x) + ' of ' + serialise(third(x), macros)) +
+		wrap_parentheses('const ' + serialise(second(x), macros) + ' of ' + serialise(third(x), macros)) +
 		wrap_braces(x.slice(3).map(plus(serialise, macros)).join('; '))
 }
 
@@ -119,7 +123,13 @@ function serialise_get(x, macros) {
 }
 
 function serialise_dot(x, macros) {
-	return [ serialise(second(x), macros), ...x.slice(2) ].join('.')
+	return [
+		serialise(second(x), macros),
+		...x.slice(2).map(x => {
+			if (stringp(x)) return x
+			else if (listp(x)) return serialise(x, macros)
+		})
+	].join('.')
 }
 
 function serialise_nested(x, macros) {
